@@ -19,11 +19,28 @@ export default function ExportDialog({ item, onClose }: { item: ExportItem; onCl
   useEffect(() => () => URL.revokeObjectURL(url), [url])
   const [message, setMessage] = useState<string | null>(null)
 
+  // 图片用 data URL 显示：iPhone 上的 Chrome 等浏览器对 blob 地址的图片
+  // 不能长按保存，也不能下载，data URL 的图片则可以长按存到相册。
+  const [dataUrl, setDataUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (item.kind !== 'png') return
+    let cancelled = false
+    const reader = new FileReader()
+    reader.onload = () => !cancelled && setDataUrl(reader.result as string)
+    reader.readAsDataURL(item.blob)
+    return () => {
+      cancelled = true
+    }
+  }, [item])
+
   const file = useMemo(
     () => new File([item.blob], item.filename, { type: item.kind === 'png' ? 'image/png' : 'text/csv' }),
     [item],
   )
   const canShare = typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })
+  // 手机上优先用系统分享（里面有"存储图像 / 存储到文件"），它在各家手机浏览器里最可靠
+  const touch = window.matchMedia('(pointer: coarse)').matches
+  const shareFirst = canShare && touch
 
   const share = async () => {
     try {
@@ -67,7 +84,11 @@ export default function ExportDialog({ item, onClose }: { item: ExportItem; onCl
 
         <div className="min-h-0 flex-1 overflow-auto rounded-xl bg-slate-100 p-2">
           {item.kind === 'png' ? (
-            <img src={url} alt="拼豆图纸" className="mx-auto block max-w-full" />
+            dataUrl ? (
+              <img src={dataUrl} alt="拼豆图纸" className="mx-auto block max-w-full [-webkit-touch-callout:default]" />
+            ) : (
+              <p className="py-10 text-center text-sm text-slate-400">正在准备图片…</p>
+            )
           ) : (
             <pre className="select-text whitespace-pre-wrap break-all text-xs leading-relaxed text-slate-700">
               {(item.text ?? '').replace(/^﻿/, '')}
@@ -77,18 +98,25 @@ export default function ExportDialog({ item, onClose }: { item: ExportItem; onCl
 
         <p className="text-xs text-slate-500">
           {item.kind === 'png'
-            ? '如果点"下载"没反应（比如在微信里打开）：长按上面的图片，选"保存图片"。'
+            ? shareFirst
+              ? '点"保存到相册 / 分享"，在弹出的菜单里选"存储图像"。也可以长按上面的图片，选"存储到照片 / 保存图片"。'
+              : '如果点"下载"没反应（比如在微信里打开）：长按上面的图片，选"保存图片"。'
             : '如果点"下载"没反应：点"复制内容"，再粘贴到备忘录或表格里。'}
         </p>
         {message && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{message}</p>}
 
         <div className="grid gap-2 sm:grid-cols-2">
-          <a href={url} download={item.filename} className={primary}>
+          {shareFirst && (
+            <button type="button" onClick={share} className={primary}>
+              {item.kind === 'png' ? '保存到相册 / 分享' : '分享 / 存到文件'}
+            </button>
+          )}
+          <a href={url} download={item.filename} className={shareFirst ? secondary : primary}>
             下载{item.kind === 'png' ? '图片' : '文件'}
           </a>
-          {canShare && (
+          {canShare && !shareFirst && (
             <button type="button" onClick={share} className={secondary}>
-              {item.kind === 'png' ? '保存到相册 / 分享' : '分享 / 存到文件'}
+              {item.kind === 'png' ? '分享' : '分享 / 存到文件'}
             </button>
           )}
           {item.kind === 'csv' && (
@@ -96,7 +124,7 @@ export default function ExportDialog({ item, onClose }: { item: ExportItem; onCl
               复制内容
             </button>
           )}
-          {item.kind === 'png' && (
+          {item.kind === 'png' && !touch && (
             <a href={url} target="_blank" rel="noreferrer" className={secondary}>
               在新页面打开
             </a>
