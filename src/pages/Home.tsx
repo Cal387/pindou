@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Uploader from '../components/Uploader'
 import CropBox from '../components/CropBox'
 import Settings from '../components/Settings'
-import PreviewCanvas from '../components/PreviewCanvas'
 import SheetCanvas from '../components/SheetCanvas'
 import Legend from '../components/Legend'
 import ExportDialog, { type ExportItem } from '../components/ExportDialog'
@@ -43,7 +42,6 @@ export default function Home() {
   const [crop, setCrop] = useState<CropRect | null>(null)
   const [options, setOptions] = useState<PatternOptions>(DEFAULT_OPTIONS)
   const [title, setTitle] = useState('')
-  const [tab, setTab] = useState<'preview' | 'sheet'>('preview')
   const [highlight, setHighlight] = useState<number | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
@@ -167,29 +165,9 @@ export default function Home() {
       </div>
 
       <div className="contents lg:flex lg:flex-col lg:gap-4">
-        <Card
-          className={`order-2 max-lg:p-2.5 lg:order-none ${
-            tab === 'preview' ? 'max-lg:sticky max-lg:top-[3.25rem] max-lg:z-[5] max-lg:shadow-md' : ''
-          }`}
-        >
+        <Card className="order-2 max-lg:sticky max-lg:top-[3.25rem] max-lg:z-[5] max-lg:p-2.5 max-lg:shadow-md lg:order-none">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm">
-              {(
-                [
-                  ['preview', '拼好效果'],
-                  ['sheet', '图纸'],
-                ] as const
-              ).map(([t, label]) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTab(t)}
-                  className={`rounded-md px-4 py-1 font-medium lg:py-1.5 ${tab === t ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-600'}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <h2 className="text-base font-semibold text-slate-900">图纸</h2>
             <p className="text-sm tabular-nums text-slate-500">
               {busy ? (
                 <span className="text-rose-600">正在生成…</span>
@@ -205,28 +183,26 @@ export default function Home() {
 
           {pattern ? (
             <div className={busy ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
-              {tab === 'preview' ? (
-                <>
-                  <PreviewCanvas pattern={pattern} brand={brand} highlight={highlight} onPick={setHighlight} />
-                  <p className="mt-1.5 text-center text-xs text-slate-400">
-                    {highlighted ? (
-                      <>
-                        正在高亮 <b className="text-slate-700">{highlighted.color.code}</b>（{highlighted.count} 颗），
-                        <button type="button" className="text-rose-600 underline" onClick={() => setHighlight(null)}>
-                          取消高亮
-                        </button>
-                      </>
-                    ) : (
-                      '点图上的豆子或下面的颜色，可以高亮这个颜色的所有位置'
-                    )}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <SheetCanvas pattern={pattern} brand={brand} usage={usage} title={title} />
-                  <p className="mt-2 text-center text-xs text-slate-400">这里是缩小显示，下载的 PNG 是高清的，可以放大看色号</p>
-                </>
-              )}
+              <SheetCanvas
+                pattern={pattern}
+                brand={brand}
+                usage={usage}
+                title={title}
+                highlight={highlight}
+                onPick={setHighlight}
+              />
+              <p className="mt-1.5 text-center text-xs text-slate-400">
+                {highlighted ? (
+                  <>
+                    正在高亮 <b className="text-slate-700">{highlighted.color.code}</b>（{highlighted.count} 颗），
+                    <button type="button" className="text-rose-600 underline" onClick={() => setHighlight(null)}>
+                      取消高亮
+                    </button>
+                  </>
+                ) : (
+                  '点图纸上的格子或下面的颜色可以高亮；下载的 PNG 是高清的，可以放大看色号'
+                )}
+              </p>
             </div>
           ) : (
             <div className="grid h-48 place-items-center text-sm text-slate-400">正在生成…</div>
@@ -271,10 +247,7 @@ export default function Home() {
               <Legend
                 usage={usage}
                 highlight={highlight}
-                onPick={(i) => {
-                  setHighlight(i)
-                  if (i !== null) setTab('preview')
-                }}
+                onPick={setHighlight}
               />
             </Card>
           </>

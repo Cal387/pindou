@@ -1,71 +1,10 @@
-/** 把图纸画到 Canvas 上：圆形豆子预览图 + 带色号的图纸 */
+/** 把图纸画到 Canvas 上：带色号的网格、行列号、标题、图例 */
 import { isDark } from './color'
 import { EMPTY } from './quantize'
 import type { Pattern, UsageItem } from './pattern'
 import type { Brand } from '../palettes'
 
 const FONT = '"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif'
-
-/** 预览图每格的像素数 */
-export function previewCellSize(cols: number): number {
-  return Math.max(10, Math.min(32, Math.floor(1400 / cols)))
-}
-
-/**
- * 画"拼好后的样子"：每格一颗圆形豆子。
- * highlight 不为 null 时，只有这个颜色正常显示，其他颜色变淡。
- */
-export function renderPreview(
-  canvas: HTMLCanvasElement,
-  pattern: Pattern,
-  brand: Brand,
-  highlight: number | null,
-): void {
-  const { cols, rows, cells } = pattern
-  const s = previewCellSize(cols)
-  canvas.width = cols * s
-  canvas.height = rows * s
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#f8fafc'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-  const r = s * 0.47
-  const hole = s * 0.13
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      const c = cells[y * cols + x]
-      const cx = x * s + s / 2
-      const cy = y * s + s / 2
-      if (c === EMPTY) {
-        // 空格：画一个小点表示底板上的钉子
-        ctx.fillStyle = '#e2e8f0'
-        ctx.beginPath()
-        ctx.arc(cx, cy, s * 0.08, 0, Math.PI * 2)
-        ctx.fill()
-        continue
-      }
-      const dim = highlight !== null && c !== highlight
-      ctx.globalAlpha = dim ? 0.13 : 1
-      ctx.fillStyle = brand.colors[c].hex
-      ctx.beginPath()
-      ctx.arc(cx, cy, r, 0, Math.PI * 2)
-      ctx.fill()
-      // 豆子中间的小孔
-      ctx.fillStyle = 'rgba(0,0,0,0.16)'
-      ctx.beginPath()
-      ctx.arc(cx, cy, hole, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.globalAlpha = 1
-      if (highlight !== null && c === highlight) {
-        ctx.lineWidth = Math.max(1.5, s * 0.1)
-        ctx.strokeStyle = '#0f172a'
-        ctx.beginPath()
-        ctx.arc(cx, cy, r - ctx.lineWidth / 2, 0, Math.PI * 2)
-        ctx.stroke()
-      }
-    }
-  }
-}
 
 export interface SheetLayout {
   /** 每格像素 */
@@ -139,11 +78,14 @@ export interface SheetData {
   brand: Brand
   usage: UsageItem[]
   title: string
+  /** 只在页面上用：高亮这个颜色（色卡下标），其他颜色变淡。导出时不传。 */
+  highlight?: number | null
 }
 
 /** 画完整图纸：网格 + 色号 + 行列号 + 右侧竖排标题 + 底部图例 */
 export function renderSheet(canvas: HTMLCanvasElement, data: SheetData, maxPixels?: number): SheetLayout {
   const { pattern, brand, usage, title } = data
+  const highlight = data.highlight ?? null
   const { cols, rows, cells } = pattern
   const L = sheetLayout(cols, rows, usage.length, maxPixels)
   const s = L.cell
@@ -167,6 +109,7 @@ export function renderSheet(canvas: HTMLCanvasElement, data: SheetData, maxPixel
       const c = cells[y * cols + x]
       if (c === EMPTY) continue
       const color = brand.colors[c]
+      ctx.globalAlpha = highlight !== null && c !== highlight ? 0.12 : 1
       ctx.fillStyle = color.hex
       ctx.fillRect(gx + x * s, gy + y * s, s, s)
       ctx.fillStyle = isDark(color.hex) ? '#ffffff' : '#1e293b'
@@ -174,6 +117,8 @@ export function renderSheet(canvas: HTMLCanvasElement, data: SheetData, maxPixel
       ctx.fillText(color.code, gx + x * s + s / 2, gy + y * s + s / 2 + s * 0.03)
     }
   }
+
+  ctx.globalAlpha = 1
 
   // 细线
   ctx.strokeStyle = 'rgba(15,23,42,0.35)'
@@ -247,6 +192,7 @@ export function renderSheet(canvas: HTMLCanvasElement, data: SheetData, maxPixel
     const x = lx + col * ITEM_W * s
     const y = ly + row * ITEM_H * s
     const sw = s * 1.1
+    ctx.globalAlpha = highlight !== null && u.index !== highlight ? 0.25 : 1
     ctx.fillStyle = u.color.hex
     ctx.fillRect(x, y, sw, sw)
     ctx.strokeStyle = 'rgba(15,23,42,0.45)'
@@ -261,6 +207,7 @@ export function renderSheet(canvas: HTMLCanvasElement, data: SheetData, maxPixel
     ctx.font = `400 ${Math.round(s * 0.42)}px ${FONT}`
     ctx.fillText(`${u.count} 颗`, x + sw + s * 0.22, y + sw * 0.76)
   })
+  ctx.globalAlpha = 1
 
   return L
 }

@@ -8,7 +8,7 @@
 
 - 上传图片（点击选择 / 拖拽 / 粘贴 / 手机相册），裁剪（正方形或自由比例）
 - 调整图纸宽度（20–100 列）、最大颜色数（8–60）、色系开关、去背景、去杂点、对比度、饱和度
-- 实时预览"拼好后的样子"，点某个颜色可以高亮它的所有位置
+- 调参数后图纸实时更新，点图纸上的格子或某个颜色可以高亮它的所有位置
 - 导出高清 PNG 图纸（带色号、行列号、图例）和 CSV 用量清单
 - `/#/palette` 色卡页：按色系列出全部颜色，方便和实物色卡对照
 
@@ -65,7 +65,7 @@ src/
     despeckle.ts      去杂点
     skin.ts           肤色柔和（减轻脸上阴影）
     pattern.ts        把上面几步串起来的完整流程 + 用量统计
-    render.ts         画预览图和图纸（Canvas）
+    render.ts         画图纸（Canvas）
     csv.ts            用量清单 CSV
     worker.ts         Web Worker，计算放在后台线程，页面不卡
     browser.ts        读图片、裁剪取像素、下载文件
@@ -75,7 +75,7 @@ src/
     index.ts          品牌定义
     palette.test.ts   色卡数据测试（221 色、无重复、各色系数量）
   hooks/usePattern.ts 调用 Worker 生成图纸（带防抖）
-  components/         界面组件（上传、裁剪、参数、预览、图纸、图例）
+  components/         界面组件（上传、裁剪、参数、图纸、图例、导出弹窗）
   pages/              页面：Home（做图纸）、PalettePage（色卡）
 scripts/
   build-palette.mjs   把 mard-raw.txt 转成 mard.json
