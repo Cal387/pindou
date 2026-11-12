@@ -147,6 +147,16 @@ export default function Settings({ brand, options, onChange, rows }: Props) {
       )}
 
       <Slider
+        label="肤色柔和"
+        min={0}
+        max={100}
+        step={5}
+        value={options.skinSoften}
+        display={options.skinSoften === 0 ? '关' : options.skinSoften}
+        hint="减轻脸上的阴影，让肤色更均匀。脸显得太平就调小，不是人像可以关掉"
+        onChange={(v) => set('skinSoften', v)}
+      />
+      <Slider
         label="去杂点"
         min={0}
         max={MAX_DESPECKLE}

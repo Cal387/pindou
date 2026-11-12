@@ -3,6 +3,7 @@ import { adjust, downsample, gaussianBlur, rowsFor, type RawImage } from './imag
 import { detectBackground } from './background'
 import { EMPTY, quantize } from './quantize'
 import { despeckle } from './despeckle'
+import { softenSkin } from './skin'
 import { compareColors, type Brand, type PaletteColor } from '../palettes'
 
 export interface PatternOptions {
@@ -22,6 +23,8 @@ export interface PatternOptions {
   contrast: number
   /** -50 ~ 50 */
   saturation: number
+  /** 肤色柔和（减轻脸上阴影），0 ~ 100，0 关闭 */
+  skinSoften: number
 }
 
 export const DEFAULT_OPTIONS: PatternOptions = {
@@ -33,6 +36,7 @@ export const DEFAULT_OPTIONS: PatternOptions = {
   despeckle: 1,
   contrast: 0,
   saturation: 0,
+  skinSoften: 50,
 }
 
 export interface Pattern {
@@ -60,7 +64,7 @@ export function paletteLabs(brand: Brand): Lab[] {
 
 /**
  * 完整流程：轻微高斯模糊 → 缩小到格子数 → 对比度/饱和度 →
- * 去背景 → 匹配色卡并限制颜色数 → 去杂点。
+ * 去背景 → 肤色柔和 → 匹配色卡并限制颜色数 → 去杂点。
  */
 export function generatePattern(src: RawImage, brand: Brand, opts: PatternOptions): Pattern {
   const cols = Math.max(1, Math.round(opts.cols))
@@ -72,7 +76,7 @@ export function generatePattern(src: RawImage, brand: Brand, opts: PatternOption
   const small = adjust(downsample(gaussianBlur(src, sigma), cols, rows), opts.contrast, opts.saturation)
 
   const n = cols * rows
-  const labs: Lab[] = new Array(n)
+  let labs: Lab[] = new Array(n)
   const empty = new Uint8Array(n)
   for (let i = 0; i < n; i++) {
     const p = i * 4
@@ -84,6 +88,9 @@ export function generatePattern(src: RawImage, brand: Brand, opts: PatternOption
     const bg = detectBackground(labs, cols, rows, opts.backgroundThreshold, empty)
     for (let i = 0; i < n; i++) if (bg[i]) empty[i] = 1
   }
+
+  // 去背景用的是原始颜色；肤色柔和放在它之后，只影响配色
+  labs = softenSkin(labs, empty, (opts.skinSoften ?? 0) / 100)
 
   const pLabs = paletteLabs(brand)
   const enabled = new Set(opts.enabledSeries)

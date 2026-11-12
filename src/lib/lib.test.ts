@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ciede2000, hexToRgb, isDark, rgbToLab, type Lab } from './color'
+import { ciede2000, deltaE, hexToRgb, isDark, rgbToLab, type Lab } from './color'
+import { skinWeight, softenSkin } from './skin'
 import { adjust, downsample, gaussianBlur, gaussianKernel, rowsFor, type RawImage } from './image'
 import { detectBackground } from './background'
 import { EMPTY, nearest, quantize } from './quantize'
@@ -315,5 +316,69 @@ describe('CSV', () => {
     expect(csv.charCodeAt(0)).toBe(0xfeff)
     const lines = csv.slice(1).trim().split('\r\n')
     expect(lines).toEqual(['色号,色系,颜色值,用量(颗)', 'A1,A 黄橙,#FAF4C8,12', 'H7,H 黑白,#000000,30', '合计,,,42'])
+  })
+})
+
+describe('肤色柔和', () => {
+  const skin: Lab = rgbToLab(240, 195, 165) // 正常肤色
+  const shadow: Lab = rgbToLab(176, 124, 96) // 脸上的阴影
+  const hair: Lab = rgbToLab(35, 28, 26) // 黑发
+  const brownHair: Lab = rgbToLab(96, 62, 44) // 深棕色头发
+  const blue: Lab = rgbToLab(54, 119, 210)
+  const face = (): Lab[] => [...Array(30).fill(skin), ...Array(10).fill(shadow), ...Array(10).fill(hair), ...Array(6).fill(brownHair), ...Array(6).fill(blue)]
+  const none = new Uint8Array(62)
+
+  it('肤色判断：肤色是，黑发、蓝色、白色、灰色不是', () => {
+    expect(skinWeight(skin)).toBeGreaterThan(0.9)
+    expect(skinWeight(shadow)).toBeGreaterThan(0.9)
+    expect(skinWeight(hair)).toBe(0)
+    expect(skinWeight(blue)).toBe(0)
+    expect(skinWeight(rgbToLab(255, 255, 255))).toBe(0)
+    expect(skinWeight(rgbToLab(128, 128, 128))).toBe(0)
+  })
+
+  it('强度 0 不处理', () => {
+    const labs = face()
+    expect(softenSkin(labs, none, 0)).toBe(labs)
+  })
+
+  it('阴影变亮、更接近正常肤色；强度越大越接近', () => {
+    const half = softenSkin(face(), none, 0.5)
+    const full = softenSkin(face(), none, 1)
+    expect(half[30][0]).toBeGreaterThan(shadow[0] + 4)
+    expect(full[30][0]).toBeGreaterThan(half[30][0])
+    expect(full[30][0]).toBeLessThanOrEqual(skin[0])
+    expect(deltaE(full[30], skin)).toBeLessThan(deltaE(shadow, skin) * 0.5)
+  })
+
+  it('正常肤色、头发、其他颜色不变', () => {
+    const out = softenSkin(face(), none, 1)
+    expect(out[0]).toEqual(skin)
+    expect(out[40]).toEqual(hair)
+    expect(out[56]).toEqual(blue)
+    // 深棕色头发比肤色暗很多，基本不动
+    expect(Math.abs(out[50][0] - brownHair[0])).toBeLessThan(1.5)
+  })
+
+  it('画面里几乎没有肤色时不处理', () => {
+    const labs: Lab[] = [...Array(99).fill(blue), shadow]
+    expect(softenSkin(labs, new Uint8Array(100), 1)).toBe(labs)
+  })
+
+  it('完整流程里：打开后脸上阴影用的颜色更亮', () => {
+    const img = solid(200, 200, [240, 195, 165])
+    fillRect(img, 100, 0, 200, 200, [176, 124, 96])
+    const lightness = (soften: number) => {
+      const p = generatePattern(img, MARD, { ...DEFAULT_OPTIONS, cols: 20, skinSoften: soften })
+      return paletteLabs(MARD)[p.cells[10 * 20 + 15]][0]
+    }
+    expect(lightness(100)).toBeGreaterThan(lightness(0) + 8)
+  })
+})
+
+describe('肤色柔和不影响嘴唇', () => {
+  it('红色的嘴唇不算肤色', () => {
+    expect(skinWeight(rgbToLab(200, 52, 74))).toBe(0)
+    expect(skinWeight(rgbToLab(216, 80, 90))).toBeLessThan(0.1)
   })
 })
