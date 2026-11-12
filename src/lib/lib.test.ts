@@ -330,8 +330,11 @@ describe('肤色柔和', () => {
 
   it('肤色判断：肤色是，黑发、蓝色、白色、灰色不是', () => {
     expect(skinWeight(skin)).toBeGreaterThan(0.9)
-    expect(skinWeight(shadow)).toBeGreaterThan(0.9)
+    expect(skinWeight(shadow)).toBeGreaterThan(0.7)
     expect(skinWeight(hair)).toBe(0)
+    // 棕色、红棕色头发的色相和肤色一样，靠亮度排除
+    expect(skinWeight(brownHair)).toBe(0)
+    expect(skinWeight(rgbToLab(141, 96, 76))).toBe(0)
     expect(skinWeight(blue)).toBe(0)
     expect(skinWeight(rgbToLab(255, 255, 255))).toBe(0)
     expect(skinWeight(rgbToLab(128, 128, 128))).toBe(0)
@@ -351,13 +354,39 @@ describe('肤色柔和', () => {
     expect(deltaE(full[30], skin)).toBeLessThan(deltaE(shadow, skin) * 0.5)
   })
 
-  it('正常肤色、头发、其他颜色不变', () => {
+  it('头发、其他颜色不变；本来就亮的肤色只是略微提亮，色相不变', () => {
     const out = softenSkin(face(), none, 1)
-    expect(out[0]).toEqual(skin)
     expect(out[40]).toEqual(hair)
+    expect(out[50]).toEqual(brownHair)
     expect(out[56]).toEqual(blue)
-    // 深棕色头发比肤色暗很多，基本不动
-    expect(Math.abs(out[50][0] - brownHair[0])).toBeLessThan(1.5)
+    expect(out[0][0]).toBeGreaterThanOrEqual(skin[0])
+    expect(out[0][0]).toBeLessThan(skin[0] + 5)
+    expect(out[0][1]).toBeCloseTo(skin[1], 5)
+    expect(out[0][2]).toBeCloseTo(skin[2], 5)
+  })
+
+  it('照片里中等亮度的脸（周围是红棕色头发）：配出干净的浅肤色，而不是灰褐色', () => {
+    // 这组颜色取自一张真实自拍：脸的像素值其实不亮，色卡里没有对应的肤色，
+    // 不处理的话会被配成 M7 / M9 这类灰褐色
+    const faceMid: Lab = rgbToLab(195, 155, 137)
+    const faceLight: Lab = rgbToLab(222, 177, 160)
+    const auburn: Lab = rgbToLab(141, 96, 76)
+    const labs: Lab[] = [...Array(60).fill(auburn), ...Array(25).fill(faceMid), ...Array(15).fill(faceLight)]
+    const empty = new Uint8Array(labs.length)
+    const pLabs = paletteLabs(MARD)
+    const all = MARD.colors.map((_, i) => i)
+    const match = (lab: Lab) => MARD.colors[nearest(lab, pLabs, all)]
+
+    expect(match(faceMid).series).toBe('M') // 问题重现
+
+    const out = softenSkin(labs, empty, 0.5)
+    const fixed = match(out[60])
+    expect(['G', 'E', 'A']).toContain(fixed.series)
+    expect(pLabs[MARD.colors.indexOf(fixed)][0]).toBeGreaterThan(76)
+    // 明暗层次还在：亮的地方仍然比暗的地方亮
+    expect(out[85][0]).toBeGreaterThan(out[60][0])
+    // 头发不受影响
+    expect(out[0]).toEqual(auburn)
   })
 
   it('画面里几乎没有肤色时不处理', () => {
