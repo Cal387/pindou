@@ -53,6 +53,17 @@ git push
 - 如果测试没通过，网站不会更新，仍然是上一个版本。
 - 仓库 **Settings → Pages** 里的 **Source** 必须选 **GitHub Actions**（只需要设置一次）。
 
+## 部署到 Cloudflare Pages（自己的域名）
+
+网站默认按 GitHub Pages 的路径 `/pindou/` 构建。放到自己的域名下时网站在根路径，
+需要在 Cloudflare Pages 的构建设置里这样填：
+
+- Build command：`npm run build`
+- Build output directory：`dist`
+- 环境变量：`BASE_PATH` = `/`，`NODE_VERSION` = `22`
+
+设置好之后，同样是每次 `git push` 自动更新。
+
 ## 代码结构
 
 ```
