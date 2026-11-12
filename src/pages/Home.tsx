@@ -5,6 +5,7 @@ import Settings from '../components/Settings'
 import PreviewCanvas from '../components/PreviewCanvas'
 import SheetCanvas from '../components/SheetCanvas'
 import Legend from '../components/Legend'
+import ExportDialog, { type ExportItem } from '../components/ExportDialog'
 import { usePattern } from '../hooks/usePattern'
 import {
   canvasToPngBlob,
@@ -47,6 +48,7 @@ export default function Home() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const [cropOpen, setCropOpen] = useState(true)
+  const [exported, setExported] = useState<ExportItem | null>(null)
 
   const handleFile = useCallback(async (file: File) => {
     setLoadError(null)
@@ -87,13 +89,20 @@ export default function Home() {
 
   const baseName = pattern ? `${safeFileName(title)}_${pattern.cols}x${pattern.rows}` : ''
 
+  // 电脑上直接触发下载；同时总是弹出结果窗口，
+  // 因为有些浏览器（微信内置、部分手机浏览器）不支持自动下载，需要长按保存或分享。
+  const finishExport = (item: ExportItem) => {
+    if (!window.matchMedia('(pointer: coarse)').matches) downloadBlob(item.blob, item.filename)
+    setExported(item)
+  }
+
   const exportPng = async () => {
     if (!pattern) return
     setExporting(true)
     try {
       const canvas = document.createElement('canvas')
       renderSheet(canvas, { pattern, brand, usage, title })
-      downloadBlob(await canvasToPngBlob(canvas), `${baseName}.png`)
+      finishExport({ kind: 'png', blob: await canvasToPngBlob(canvas), filename: `${baseName}.png` })
       canvas.width = canvas.height = 0 // 及时释放内存
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e))
@@ -104,7 +113,8 @@ export default function Home() {
 
   const exportCsv = () => {
     const names = Object.fromEntries(brand.series.map((s) => [s.id, s.name]))
-    downloadBlob(new Blob([usageToCsv(usage, names)], { type: 'text/csv;charset=utf-8' }), `${baseName}_用量.csv`)
+    const text = usageToCsv(usage, names)
+    finishExport({ kind: 'csv', blob: new Blob([text], { type: 'text/csv;charset=utf-8' }), filename: `${baseName}_用量.csv`, text })
   }
 
   if (!source) {
@@ -127,6 +137,7 @@ export default function Home() {
     // 手机上的顺序：裁剪 → 预览（吸在屏幕顶部）→ 参数 → 导出 → 用量清单，
     // 这样拖滑块时一直能看到预览。电脑上是左右两栏。
     <div className="grid gap-3 lg:grid-cols-[22rem_1fr] lg:items-start lg:gap-4">
+      {exported && <ExportDialog item={exported} onClose={() => setExported(null)} />}
       <div className="contents lg:flex lg:flex-col lg:gap-4">
         <Card
           className="order-1 lg:order-none"
