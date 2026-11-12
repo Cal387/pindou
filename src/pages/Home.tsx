@@ -23,9 +23,9 @@ import { MARD } from '../palettes'
 
 const brand = MARD
 
-function Card(props: { title?: string; extra?: React.ReactNode; children: React.ReactNode }) {
+function Card(props: { title?: string; extra?: React.ReactNode; className?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+    <section className={`rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200 ${props.className ?? ''}`}>
       {(props.title || props.extra) && (
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-slate-900">{props.title}</h2>
@@ -46,6 +46,7 @@ export default function Home() {
   const [highlight, setHighlight] = useState<number | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [cropOpen, setCropOpen] = useState(true)
 
   const handleFile = useCallback(async (file: File) => {
     setLoadError(null)
@@ -53,6 +54,7 @@ export default function Home() {
       const img = await loadImageFile(file)
       setCrop(null)
       setHighlight(null)
+      setCropOpen(true)
       setSource((old) => {
         if (old) URL.revokeObjectURL(old.url)
         return img
@@ -122,20 +124,44 @@ export default function Home() {
   const highlighted = usage.find((u) => u.index === highlight)
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
-      <div className="space-y-4">
-        <Card title="1. 裁剪图片" extra={<Uploader compact onFile={handleFile} />}>
-          <CropBox source={source} onCrop={setCrop} />
+    // 手机上的顺序：裁剪 → 预览（吸在屏幕顶部）→ 参数 → 导出 → 用量清单，
+    // 这样拖滑块时一直能看到预览。电脑上是左右两栏。
+    <div className="grid gap-3 lg:grid-cols-[22rem_1fr] lg:items-start lg:gap-4">
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
+        <Card
+          className="order-1 lg:order-none"
+          title="1. 裁剪图片"
+          extra={
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCropOpen((v) => !v)}
+                className="rounded-lg px-2 py-1.5 text-sm font-medium text-rose-600 lg:hidden"
+              >
+                {cropOpen ? '收起' : '展开'}
+              </button>
+              <Uploader compact onFile={handleFile} />
+            </div>
+          }
+        >
+          <div className={cropOpen ? '' : 'hidden lg:block'}>
+            <CropBox source={source} onCrop={setCrop} />
+          </div>
+          {!cropOpen && <p className="text-xs text-slate-400 lg:hidden">裁剪已收起，点"展开"可以重新调整范围</p>}
           {loadError && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{loadError}</p>}
         </Card>
-        <Card title="2. 调整参数">
+        <Card className="order-3 lg:order-none" title="2. 调整参数">
           <Settings brand={brand} options={options} onChange={setOptions} rows={rows} />
         </Card>
       </div>
 
-      <div className="space-y-4">
-        <Card>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="contents lg:flex lg:flex-col lg:gap-4">
+        <Card
+          className={`order-2 max-lg:p-2.5 lg:order-none ${
+            tab === 'preview' ? 'max-lg:sticky max-lg:top-[3.25rem] max-lg:z-[5] max-lg:shadow-md' : ''
+          }`}
+        >
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-sm">
               {(
                 [
@@ -147,7 +173,7 @@ export default function Home() {
                   key={t}
                   type="button"
                   onClick={() => setTab(t)}
-                  className={`rounded-md px-4 py-1.5 font-medium ${tab === t ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-600'}`}
+                  className={`rounded-md px-4 py-1 font-medium lg:py-1.5 ${tab === t ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-600'}`}
                 >
                   {label}
                 </button>
@@ -171,7 +197,7 @@ export default function Home() {
               {tab === 'preview' ? (
                 <>
                   <PreviewCanvas pattern={pattern} brand={brand} highlight={highlight} onPick={setHighlight} />
-                  <p className="mt-2 text-center text-xs text-slate-400">
+                  <p className="mt-1.5 text-center text-xs text-slate-400">
                     {highlighted ? (
                       <>
                         正在高亮 <b className="text-slate-700">{highlighted.color.code}</b>（{highlighted.count} 颗），
@@ -198,7 +224,7 @@ export default function Home() {
 
         {pattern && (
           <>
-            <Card title="3. 导出">
+            <Card className="order-4 lg:order-none" title="3. 导出">
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-slate-700">作品名（显示在图纸右侧，可以不填）</span>
                 <input
@@ -230,7 +256,7 @@ export default function Home() {
               </div>
             </Card>
 
-            <Card title={`用量清单 · ${usage.length} 种颜色 · 共 ${total} 颗`}>
+            <Card className="order-5 lg:order-none" title={`用量清单 · ${usage.length} 种颜色 · 共 ${total} 颗`}>
               <Legend
                 usage={usage}
                 highlight={highlight}

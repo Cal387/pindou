@@ -65,7 +65,7 @@ export default function CropBox({ source, onCrop }: Props) {
             if (percent.width > 0 && percent.height > 0) onCrop(percent)
           }}
         >
-          <img src={source.url} alt="原图" className="max-h-[46vh] w-auto select-none" draggable={false} />
+          <img src={source.url} alt="原图" className="max-h-[34vh] w-auto lg:max-h-[46vh] select-none" draggable={false} />
         </ReactCrop>
       </div>
     </div>

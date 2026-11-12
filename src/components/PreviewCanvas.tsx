@@ -22,7 +22,7 @@ export default function PreviewCanvas({ pattern, brand, highlight, onPick }: Pro
   return (
     <canvas
       ref={ref}
-      className="mx-auto block max-h-[75vh] max-w-full cursor-pointer rounded-lg"
+      className="mx-auto block max-h-[36vh] max-w-full lg:max-h-[75vh] cursor-pointer rounded-lg"
       onClick={(e) => {
         const rect = e.currentTarget.getBoundingClientRect()
         const x = Math.floor(((e.clientX - rect.left) / rect.width) * pattern.cols)
